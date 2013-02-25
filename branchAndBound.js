@@ -6,7 +6,7 @@
             var setBounds = function (box) {
                 box.upperBound = upperBoundFunc(box);
                 box.lowerBound = lowerBoundFunc(box);
-            }
+            };
 
             var updateBoundary = function (box) {
 
@@ -20,7 +20,7 @@
                     return true;
                 }
                 return false;
-            }
+            };
 
             var clearBoxes = function () {
 
@@ -31,24 +31,24 @@
                 if (type === 'min') {
                     boxQueue.all(function (box, index) {
                         if (box.lowerBound > minUpperBound) {
-                            remaining -= Math.pow(.5, box.split);
+                            remaining -= Math.pow(0.5, box.split);
                             boxQueue.removeAt(index);
                         } else {
                             if (box.lowerBound < minLowerBound) { minLowerBound = box.lowerBound; }
-                        };
-                    })
+                        }
+                    });
                 } else if (type === 'max') {
                     boxQueue.all(function (box, index) {
                         if (box.upperBound < maxLowerBound) {
-                            remaining -= Math.pow(.5, box.split);
+                            remaining -= Math.pow(0.5, box.split);
                             boxQueue.removeAt(index);
                         } else {
                             if (box.upperBound > maxUpperBound) { maxUpperBound = box.upperBound; }
-                        };
-                    })
+                        }
+                    });
                 }
 
-            }
+            };
 
             var weights = [];
             var isDiscrete = [];
@@ -61,7 +61,7 @@
                     size *= weights[i] * (1 + box.vars[i].max - box.vars[i].min);
                 }
                 return size;
-            }
+            };
 
             var splitBox = function (box) {
 
@@ -86,7 +86,7 @@
 
                 var maxVar = box.vars[maxIndex];
 
-                var middle = maxVar.min + (maxVar.max - maxVar.min) * .51;
+                var middle = maxVar.min + (maxVar.max - maxVar.min) * 0.51;
 
                 var leftMax = middle;
                 var rightMin = middle;
@@ -104,7 +104,7 @@
 
                 return { leftChild: leftChild, rightChild: rightChild };
 
-            }
+            };
 
             for (var i = 0; i < initialBox.vars.length; i++) {
                 weights.push(initialBox.vars[i].weight);
@@ -171,8 +171,8 @@
                         iterationCallback({
                             remainingPercent: remaining,
                             remainingCount: boxQueue.length(),
-                            lowerBound: minLowerBound, 
-                            upperBound: minUpperBound, 
+                            lowerBound: minLowerBound,
+                            upperBound: minUpperBound,
                             iterations: count
                         });
                     }
@@ -183,7 +183,7 @@
                             lowerBound: maxLowerBound,
                             upperBound: maxUpperBound,
                             iterations: count
-                    });
+                        });
                     }
                 }
 
@@ -191,9 +191,9 @@
                     return bestBox;
                 } else if (type === 'max' && (maxUpperBound - maxLowerBound) <= tolerance) {
                     return bestBox;
-                } 
+                }
             }
 
         }
-    }
+    };
 })();
