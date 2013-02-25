@@ -1,4 +1,4 @@
-(function() {
+(function () {
 
     this.branchAndBound = {
         run: function (type, lowerBoundFunc, upperBoundFunc, initialBox, tolerance, iterationCallback) {
@@ -26,56 +26,78 @@
 
                 maxUpperBound = -Infinity;
                 minLowerBound = Infinity;
+                var removedBox;
 
-                for (var i = boxQueue.length - 1; i >= 0; i--) { // We are going to remove elements from this array so let's go in reverse order
-                    var box = boxQueue[i];
-                    if (type === 'min' && box.lowerBound > minUpperBound) {
-                        var removedBox = boxQueue.splice(i, 1)[0];
-                        remaining -= Math.pow(.5, removedBox.split);
-                    } else if (type === 'max' && box.upperBound < maxLowerBound) {
-                        var removedBox = boxQueue.splice(i, 1)[0];
-                        remaining -= Math.pow(.5, removedBox.split);
-                    } else {
-                        if (box.lowerBound < minLowerBound) { minLowerBound = box.lowerBound; }
-                        if (box.upperBound > maxUpperBound) { maxUpperBound = box.upperBound; }
-                    }
+                if (type === 'min') {
+                    boxQueue.all(function (box, index) {
+                        if (box.lowerBound > minUpperBound) {
+                            remaining -= Math.pow(.5, box.split);
+                            boxQueue.removeAt(index);
+                        } else {
+                            if (box.lowerBound < minLowerBound) { minLowerBound = box.lowerBound; }
+                        };
+                    })
+                } else if (type === 'max') {
+                    boxQueue.all(function (box, index) {
+                        if (box.upperBound < maxLowerBound) {
+                            remaining -= Math.pow(.5, box.split);
+                            boxQueue.removeAt(index);
+                        } else {
+                            if (box.upperBound > maxUpperBound) { maxUpperBound = box.upperBound; }
+                        };
+                    })
                 }
+
+            }
+
+            var weights = [];
+            var isDiscrete = [];
+
+            var getBoxSize = function (box) {
+
+                var size = 1;
+
+                for (var i = 0; i < weights.length; i++) {
+                    size *= weights[i] * (1 + box.vars[i].max - box.vars[i].min);
+                }
+                return size;
             }
 
             var splitBox = function (box) {
+
                 var maxDistance = 0;
                 var maxIndex = 0;
 
-                var leftChild = { variables: [], split: (box.split || 0) + 1 };
-                var rightChild = { variables: [], split: (box.split || 0) + 1 };
+                var leftChild = { vars: [], split: (box.split || 0) + 1 };
+                var rightChild = { vars: [], split: (box.split || 0) + 1 };
 
-                for (var i = 0; i < box.variables.length; i++) {
-                    var currentVar = box.variables[i];
-                    var distance = (currentVar.weight || 1) * (currentVar.max - currentVar.min);
+                for (var i = 0; i < box.vars.length; i++) {
+                    var currentVar = box.vars[i];
+                    var distance = (weights[i] || 1) * (currentVar.max - currentVar.min);
                     if (distance > maxDistance) {
                         maxDistance = distance;
                         maxIndex = i;
                     }
 
-                    leftChild.variables.push({ name: currentVar.name, min: currentVar.min, max: currentVar.max, weight: currentVar.weight, isDiscrete: currentVar.isDiscrete });
-                    rightChild.variables.push({ name: currentVar.name, min: currentVar.min, max: currentVar.max, weight: currentVar.weight, isDiscrete: currentVar.isDiscrete });
+                    leftChild.vars.push({ min: currentVar.min, max: currentVar.max });
+                    rightChild.vars.push({ min: currentVar.min, max: currentVar.max });
 
                 }
 
-                var maxVar = box.variables[maxIndex];
+                var maxVar = box.vars[maxIndex];
 
                 var middle = maxVar.min + (maxVar.max - maxVar.min) * .51;
 
                 var leftMax = middle;
                 var rightMin = middle;
 
-                if (maxVar.isDiscrete) {
+                if (isDiscrete[maxIndex]) {
                     leftMax = Math.floor(leftMax);
                     rightMin = Math.ceil(rightMin);
                 }
 
-                leftChild.variables[maxIndex].max = leftMax;
-                rightChild.variables[maxIndex].min = rightMin;
+                leftChild.vars[maxIndex].max = leftMax;
+                rightChild.vars[maxIndex].min = rightMin;
 
                 setBounds(leftChild);
                 setBounds(rightChild);
@@ -84,9 +106,14 @@
 
             }
 
-            var boxQueue = [initialBox];
-            var bestBox = initialBox;
+            for (var i = 0; i < initialBox.vars.length; i++) {
+                weights.push(initialBox.vars[i].weight);
+                isDiscrete.push(initialBox.vars[i].isDiscrete);
+            }
 
+            var boxQueue = new Queue();
+            boxQueue.enqueue(initialBox);
+            var bestBox = initialBox;
             setBounds(initialBox);
 
             var minUpperBound, maxUpperBound, maxLowerBound, minLowerBound;
@@ -102,34 +129,65 @@
                 throw 'Invalid optimization type';
             }
 
-            var abortAt = 500000;
+            var abortAt = 50000000;
             var count = 0;
+            var boxToSplit;
+            var result;
+            var leftChild;
+            var rightChild;
+            var clearAt = 100000;
 
             while (count++ < abortAt) {
+
+                if (count % clearAt === 0) {
+                    boxQueue.clean();
+                }
+
                 // pick a box to split
-                var boxToSplit = boxQueue.splice(0, 1)[0];
+                boxToSplit = boxQueue.dequeue();
+
                 // pick a variable to split on
-                var result = splitBox(boxToSplit);
-                var leftChild = result.leftChild;
-                var rightChild = result.rightChild;
-                boxQueue.push(leftChild);
-                boxQueue.push(rightChild);
+                result = splitBox(boxToSplit);
+                leftChild = result.leftChild;
+                rightChild = result.rightChild;
 
                 if (updateBoundary(leftChild)) {
                     clearBoxes();
+                    boxQueue.cheat(leftChild);
+                } else {
+                    boxQueue.enqueue(leftChild);
                 }
 
                 if (updateBoundary(rightChild)) {
                     clearBoxes();
+                    boxQueue.cheat(rightChild);
+                } else {
+                    boxQueue.enqueue(rightChild);
+
                 }
 
                 if (typeof iterationCallback === 'function') {
-                    if (type === 'min') { iterationCallback(remaining, minLowerBound, minUpperBound); }
-                    if (type === 'max') { iterationCallback(remaining, maxLowerBound, maxUpperBound); }
+                    if (type === 'min') {
+                        iterationCallback({
+                            remainingPercent: remaining,
+                            remainingCount: boxQueue.length(),
+                            lowerBound: minLowerBound, 
+                            upperBound: minUpperBound, 
+                            iterations: count
+                        });
+                    }
+                    if (type === 'max') {
+                        iterationCallback({
+                            remainingPercent: remaining,
+                            remainingCount: boxQueue.length(),
+                            lowerBound: maxLowerBound,
+                            upperBound: maxUpperBound,
+                            iterations: count
+                    });
+                    }
                 }
 
                 if (type === 'min' && (minUpperBound - minLowerBound) <= tolerance) {
-                    console.log(count);
                     return bestBox;
                 } else if (type === 'max' && (maxUpperBound - maxLowerBound) <= tolerance) {
                     return bestBox;
