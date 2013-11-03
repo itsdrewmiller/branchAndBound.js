@@ -9,10 +9,10 @@ This is a simple javascript tool for running branch and bound optimization on ca
 
 As a simple example, let's say we have the following function:
 
-(100-3*y)*(x ? 10 : 15) + (200+y)8(x ? 20 : 17)
+    2x^2y - 4xy + y
 
 And let's say further we are subject to the following constraint:
-x is either 0 or 1
+x is either 0, 1, or 2
 y is between 0 and 20
 
 This equation has a discontinuity, which makes it difficult for many optimization techniques.  For box and bound, that isn't a problem.
@@ -22,18 +22,22 @@ This equation has a discontinuity, which makes it difficult for many optimizatio
 The first step is coming up with two equations that definitely bound the answer, for a given range of x and y.  For this equation, some goood choices would be:
 
     bnb.lowerBound = function(box) {
-        return (100-3*box.max.y) * (box.max.x ? 10 : 15) + (200 + box.min.y)*(box.min.x ? 20 : 17);
-    }
+        return 2*box.x.min*box.x.min*box.y.min - 4*box.x.max*box.y.max + box.y.min;
+    };
 
     bnb.upperBound = function(box) {
-        return (100-3*box.min.y) * (box.min.x ? 10 : 15) + (200 + box.max.y)*(box.max.x ? 20 : 17);
-    }
+        return 2*box.x.max*box.x.max*box.y.max - 4*box.x.min*box.y.min + box.y.max;
+    };
+
 
 Basically, just assume either the best or worst case for each use of the variable, and calculate the whole value from that.  In general, there isn't a magical formula for figuring out these bounding functions; that's the hardest part of the branch and bound algorithm, though take heart that you don't always have to come up with something really elaborate, as long as its range narrows as your boxes get smaller.
 
 Now, let's define the input parameters and their constraints:
 
-    bnb.initialBox = { x: { min: 0, max: 1, isDiscrete: true, splitWeight: 100 }, y: { min: 0, max: 20 }}
+    bnb.initialBox = { 
+        x: { min: 0, max: 2, isDiscrete: true, splitWeight: 100 }, 
+        y: { min: 0, max: 20 }
+    };
 
 The *isDiscrete* property here does what it sounds like, and the *splitWeight* gives a hint to the algorithm that even though the distance between the min and max of this variable is small, it's actually pretty important.  This kind of optimization can make a huge difference compared to naive splitting, where big distance, low impact variables by default will be split many times before low distance ones.
 
@@ -48,7 +52,8 @@ Once you've set all those things, you're ready to run:
 
     bnb.start(function (err, bnb) {
         console.log('Finished');
-        console.dir(bnb);
+        console.log('X range = ' + bnb.bestBox.x.min + ' to ' + bnb.bestBox.x.max);
+        console.log('Y range = ' + bnb.bestBox.y.min + ' to ' + bnb.bestBox.y.max);
     });
 
 The bnb returned in the callback is the same as the one calling it, so you don't really need to handle anything in the callback if you don't want to.
@@ -56,7 +61,7 @@ The bnb returned in the callback is the same as the one calling it, so you don't
 Because this process can be a little time consuming, you also have the option of providing a function to be called each iteration.  Something like this:
 
     bnb.iteration = function (status) {
-        if (!(status.count % 25000)) {
+        if (!(status.count % 250)) {
             console.dir(status);
         }
     };

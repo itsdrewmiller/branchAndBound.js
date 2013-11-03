@@ -63,14 +63,12 @@ function Bnb(type) {
 
     var updateBoxesAndBounds = function (boxes, bounds) {
 
-        console.log('Came in with ' + bounds.minLower + ' to ' + bounds.minUpper);
-
         var bestBox = null;
         bounds.minLower = Infinity;
         bounds.minUpper = Infinity;
 
-        boxes.all(function (box, index) {
-            if (!box) { return; }
+
+        _.forEach(boxes, function (box, index) {
             if (box.lower < bounds.minLower) {
                 bounds.minLower = box.lower;
             }
@@ -80,8 +78,6 @@ function Bnb(type) {
             }
         });
 
-        console.log('left with ' + bounds.minLower + ' to ' + bounds.minUpper);
-
         return bestBox;
     };
 
@@ -89,7 +85,7 @@ function Bnb(type) {
 
         // do some prep
         var properties = [];
-        for (prop in this.initialBox) {
+        for (var prop in this.initialBox) {
             if (this.initialBox.hasOwnProperty(prop) && typeof(this.initialBox[prop]) === 'object') {
                 properties.push(prop);
             }
@@ -101,10 +97,10 @@ function Bnb(type) {
         var bounds = {
             minLower: this.initialBox.lower,
             minUpper: this.initialBox.upper
-        }
+        };
 
-        var boxes = new Queue();
-        boxes.enqueue(this.initialBox);
+        var boxes = [];
+        boxes.push(this.initialBox);
 
         // do the logic
         //   split that box, recalculate boundaries, and if any of them change clear boxes and rejigger
@@ -116,13 +112,12 @@ function Bnb(type) {
 
         var needToUpdate = false;
         var updateRange = 1000;
-        var autoCleanRange = 50000;
 
         while (count++ < this.loopAbort) {
 
             var boxToSplit = null;
             while (boxToSplit === null) {
-                boxToSplit = boxes.dequeue();
+                boxToSplit = boxes.shift();
                 if (boxToSplit.lower > bounds.minUpper) {
                     boxToSplit = null;
                 }
@@ -144,9 +139,9 @@ function Bnb(type) {
                     bounds.minUpper = leftBox.upper;
                     this.bestBox = leftBox;
                 }
-                boxes.cheat(leftBox);
+                boxes.unshift(leftBox);
             } else {
-                boxes.enqueue(leftBox);
+                boxes.push(leftBox);
             }
 
             var rightBox = split.right;
@@ -157,18 +152,14 @@ function Bnb(type) {
                     bounds.minUpper = rightBox.upper;
                     this.bestBox = rightBox;
                 }
-                boxes.cheat(rightBox);
+                boxes.unshift(rightBox);
             } else {
-                boxes.enqueue(rightBox);
+                boxes.push(rightBox);
             }
 
-            if (needToUpdate && !(count % updateRange )) {
+            if (needToUpdate && (count % updateRange) === 0) {
                 this.bestBox = updateBoxesAndBounds(boxes, bounds);
                 needToUpdate = false;
-            }
-
-            if (!(count % autoCleanRange )) {
-                this.bestBox = updateBoxesAndBounds(boxes, bounds);
             }
 
             this.iteration({
@@ -178,13 +169,10 @@ function Bnb(type) {
             });
 
             if (bounds.minUpper - bounds.minLower <= this.tolerance) {
-                console.log('Done!  Lower: ' + bounds.minLower + '.  Upper: ' + bounds.minUpper + '.');
-                boxes.clean();
-                console.dir(boxes.array);
                 callback(null, this);
                 return;
             }
         }
-    }
+    };
 
 }
