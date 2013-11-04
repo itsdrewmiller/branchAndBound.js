@@ -68,7 +68,7 @@ function Bnb(type) {
         bounds.minUpper = Infinity;
 
 
-        _.forEach(boxes, function (box, index) {
+        boxes.all(function (box, index) {
             if (box.lower < bounds.minLower) {
                 bounds.minLower = box.lower;
             }
@@ -99,8 +99,8 @@ function Bnb(type) {
             minUpper: this.initialBox.upper
         };
 
-        var boxes = [];
-        boxes.push(this.initialBox);
+        var boxes = new Queue();
+        boxes.enqueue(this.initialBox);
 
         // do the logic
         //   split that box, recalculate boundaries, and if any of them change clear boxes and rejigger
@@ -117,7 +117,7 @@ function Bnb(type) {
 
             var boxToSplit = null;
             while (boxToSplit === null) {
-                boxToSplit = boxes.shift();
+                boxToSplit = boxes.dequeue();
                 if (boxToSplit.lower > bounds.minUpper) {
                     boxToSplit = null;
                 }
@@ -139,9 +139,9 @@ function Bnb(type) {
                     bounds.minUpper = leftBox.upper;
                     this.bestBox = leftBox;
                 }
-                boxes.unshift(leftBox);
+                boxes.cheat(leftBox);
             } else {
-                boxes.push(leftBox);
+                boxes.enqueue(leftBox);
             }
 
             var rightBox = split.right;
@@ -152,9 +152,9 @@ function Bnb(type) {
                     bounds.minUpper = rightBox.upper;
                     this.bestBox = rightBox;
                 }
-                boxes.unshift(rightBox);
+                boxes.cheat(rightBox);
             } else {
-                boxes.push(rightBox);
+                boxes.enqueue(rightBox);
             }
 
             if (needToUpdate && (count % updateRange) === 0) {
